@@ -1,0 +1,401 @@
+---
+title: "FoR_Stats"
+author: "Asia Jones"
+date: "`r format(Sys.time(), '%B %d, %Y')`"
+output:
+  pdf_document: default
+  html_document: default
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE,
+                      cache = FALSE,
+                      warning = FALSE)
+
+library(doBy)
+library(parameters)
+library(ggplot2)
+```
+
+```{r Data Import}
+dat <- read.csv("/Users/aaval/Desktop/Current Courses/ENV 203 Policy Clinic/Statistics/Del+Puerto+Canyon+Usage+Survey+_+Encuesta+de+uso+del+Cañón+del+Puerto_May+14,+2023_15.50.csv", na.strings = "")
+dat <- janitor::clean_names(dat) #This standardizes the column names to get rid of weird characters
+dat <- dat[,17:56] ##This is only including columns I need, which are the ones with the Q in the title for questions
+```
+
+```{r Data Cleaning}
+#Below is cleaning Visit question to make numeric, using averages and if over 10 the response given. Also deletes an outlier which was deemed a typo, but the other data points seemed good so it was not excluded
+dat$visits_num <- dat$q2_6_text
+dat$visits_num[which(dat$q2 == "0 times")] <- 0
+dat$visits_num[which(dat$q2 == "1-2 times")] <- 1.5
+dat$visits_num[which(dat$q2 == "3-4 times")] <- 3.5
+dat$visits_num[which(dat$q2 == "5-8 times")] <- 6.5
+dat$visits_num[which(dat$q2 == "8-10 times")] <- 9
+dat$visits_num[1:2] <- NA
+dat$visits_num <-as.numeric(dat$visits_num)
+dat$visits_num[which(dat$visits_num == 10000)] <- NA
+dat$visits_num_ceiling <- ceiling(dat$visits_num)
+
+#This will create a new column with a weight for each of the levels of concern for Water for Ag
+dat$waterforag <- dat$q9_1
+dat$waterforag[which(dat$q9_1 == "Not Concerned")] <- 0
+dat$waterforag[which(dat$q9_1 == "Somewhat Concerned")] <- 1
+dat$waterforag[which(dat$q9_1 == "Concerned")] <- 2
+dat$waterforag[which(dat$q9_1 == "Very Concerned")] <- 3
+dat$waterforag <-as.numeric(dat$waterforag)
+
+#This will create a new column with a weight for each of the levels of concern for Drinking Water
+dat$dw <- dat$q9_2
+dat$dw[which(dat$q9_2 == "Not Concerned")] <- 0
+dat$dw[which(dat$q9_2 == "Somewhat Concerned")] <- 1
+dat$dw[which(dat$q9_2 == "Concerned")] <- 2
+dat$dw[which(dat$q9_2 == "Very Concerned")] <- 3
+dat$dw <-as.numeric(dat$dw)
+
+#This will create a new column with a weight for each of the levels of concern for Air Quality
+dat$aq <- dat$q9_3
+dat$aq[which(dat$q9_3 == "Not Concerned")] <- 0
+dat$aq[which(dat$q9_3 == "Somewhat Concerned")] <- 1
+dat$aq[which(dat$q9_3 == "Concerned")] <- 2
+dat$aq[which(dat$q9_3 == "Very Concerned")] <- 3
+dat$aq <-as.numeric(dat$aq)
+
+#This will create a new column with a weight for each of the levels of concern for Asthma
+dat$asthma <- dat$q9_4
+dat$asthma[which(dat$q9_4 == "Not Concerned")] <- 0
+dat$asthma[which(dat$q9_4 == "Somewhat Concerned")] <- 1
+dat$asthma[which(dat$q9_4 == "Concerned")] <- 2
+dat$asthma[which(dat$q9_4 == "Very Concerned")] <- 3
+dat$asthma <-as.numeric(dat$asthma)
+
+#This will create a new column with a weight for each of the levels of concern for Access to Natural Spaces
+dat$natspace <- dat$q9_5
+dat$natspace[which(dat$q9_5 == "Not Concerned")] <- 0
+dat$natspace[which(dat$q9_5 == "Somewhat Concerned")] <- 1
+dat$natspace[which(dat$q9_5 == "Concerned")] <- 2
+dat$natspace[which(dat$q9_5 == "Very Concerned")] <- 3
+dat$natspace <-as.numeric(dat$natspace)
+
+#This will create a new column with a weight for each of the levels of concern for Flooding
+dat$flooding <- dat$q9_6
+dat$flooding[which(dat$q9_6 == "Not Concerned")] <- 0
+dat$flooding[which(dat$q9_6 == "Somewhat Concerned")] <- 1
+dat$flooding[which(dat$q9_6 == "Concerned")] <- 2
+dat$flooding[which(dat$q9_6 == "Very Concerned")] <- 3
+dat$flooding <-as.numeric(dat$flooding)
+
+#This will create a new column with a weight for each of the levels of concern for Endangered Species
+dat$es <- dat$q9_7
+dat$es[which(dat$q9_7 == "Not Concerned")] <- 0
+dat$es[which(dat$q9_7 == "Somewhat Concerned")] <- 1
+dat$es[which(dat$q9_7 == "Concerned")] <- 2
+dat$es[which(dat$q9_7 == "Very Concerned")] <- 3
+dat$es <-as.numeric(dat$es)
+
+
+
+#Changes age to factor and deletes top two rows which are not data
+dat$age <- dat$q14
+dat$age[1:2] <- NA
+dat$age <-as.factor(dat$age)
+#Changes ethnicity to factor and deletes top two rows which are not data
+dat$ethnicity <- dat$q13
+dat$ethnicity[1:2] <- NA
+dat$ethnicity <-as.factor(dat$ethnicity)
+#Changes income to factor and deletes top two rows which are not data
+dat$income <- dat$q16
+dat$income[1:2] <- NA
+dat$income <- factor(dat$income, levels = c("$0 - $24,999",
+                                            "$25,000 - $49,999",
+                                            "$50,000 - $74,999",
+                                            "$75,000 - $99,999",
+                                            "$100,000 - $149,999",
+                                            "$150,000 - $199,999",
+                                            "$200,000 or greater",
+                                            "Prefer not to indicate"))
+#Changes Patterson to factor and deletes top two rows which are not data
+dat$patterson <- dat$q11
+dat$patterson[1:2] <- NA
+dat$patterson <-as.factor(dat$patterson)
+#Changes is dam worth it to factor and deletes top two rows which are not data
+dat$worthit <- dat$q10
+dat$worthit[1:2] <- NA
+dat$worthit <-as.factor(dat$worthit)
+#Changes if dammed how would this impact number of times you partake in activities to factor and deletes top two rows which are not data
+dat$ifdammedtimes <- dat$q6
+dat$ifdammedtimes[1:2] <- NA
+dat$ifdammedtimes <-as.factor(dat$ifdammedtimes)
+#Changes if dammed how would this impact distance to partake in activities to factor and deletes top two rows which are not data
+dat$ifdammeddist <- dat$q5
+dat$ifdammeddist[1:2] <- NA
+dat$ifdammeddist <-as.factor(dat$ifdammeddist)
+
+#This cleans the Reason data by breaking it into its own columns and then having 1 for true and 0 for false
+#Lines were split by column, with a row id and then matched back into the data frame to not mix up users
+#Data was checked to make sure that the merge was successful
+#This could potentially also be done for race data; however, respondents seemed confused about the question and ethnicity data seems more valuable here due to that confusion
+dat$id <- as.numeric(rownames(dat))
+q4 <- dat[, c("id", "q4")]
+q4$q4[1:2] <- NA
+q4_fixed <- as.data.frame(NULL)
+for(i in q4$id) {
+  q4_split <- unlist(strsplit(q4$q4[which(q4$id == i)], ","))
+  q4_split <- as.data.frame(cbind(i, q4_split))
+  q4_fixed <- rbind(q4_fixed, q4_split)
+}
+q4_dcast <- reshape2::dcast(q4_fixed, i ~ q4_split, fill = 0, fun.aggregate = length)
+q4_dcast$i <- as.numeric(q4_dcast$i)
+q4_dcast <- janitor::clean_names(q4_dcast)
+dat <- merge.data.frame(dat, q4_dcast, by.x = "id", by.y = "i")
+dat <- dat[-(1:2),]
+```
+
+
+```{r Basic Stats}
+table(dat$patterson)
+
+table(dat$ethnicity)
+
+table(dat$ifdammeddist)
+
+table(dat$ifdammedtimes)
+
+table(dat$worthit)
+
+table(dat$q18)
+```
+
+
+```{r Boolean Reasons for Visiting}
+
+
+#This is to look at ethnicity and how that is correlated with identifying cultural interest as a reason to visit
+table(dat$ethnicity,dat$cultural_interest)
+#The new dataframe below filters out the prefer not to indicate data as it is not important in answering the question of how different ethnicities value using the canyon. This dataframe should be used for all other ethnicity questions
+dat_eth <- dplyr::filter(dat, ethnicity != "Prefer not to indicate")
+eth_ci <- chisq.test(dat_eth$ethnicity,dat_eth$cultural_interest,correct = FALSE)
+eth_ci
+
+#ethnicity x wildlife
+table(dat_eth$ethnicity, dat_eth$view_wildlife)
+eth_wild <- chisq.test(dat_eth$ethnicity,dat_eth$view_wildlife,correct = FALSE)
+eth_wild
+
+#ethnicity x photography
+table(dat_eth$ethnicity, dat_eth$photography)
+eth_photo <- chisq.test(dat_eth$ethnicity,dat_eth$photography,correct = FALSE)
+eth_photo
+
+#ethnicity x family gatherings
+table(dat_eth$ethnicity, dat_eth$family_gatherings)
+eth_fam <- chisq.test(dat_eth$ethnicity,dat_eth$family_gatherings,correct = FALSE)
+eth_fam
+
+#ethnicity x hiking or walking
+table(dat_eth$ethnicity, dat_eth$hiking_or_walking)
+eth_hike <- chisq.test(dat_eth$ethnicity,dat_eth$hiking_or_walking,correct = FALSE)
+eth_hike
+
+#ethnicity x community events
+table(dat_eth$ethnicity, dat_eth$community_events)
+eth_comm <- chisq.test(dat_eth$ethnicity,dat_eth$community_events,correct = FALSE)
+eth_comm
+
+#ethnicity x road cycling
+table(dat_eth$ethnicity, dat_eth$road_cycling)
+eth_rdcyc <- chisq.test(dat_eth$ethnicity,dat_eth$road_cycling,correct = FALSE)
+eth_rdcyc
+
+#ethnicity x view plants
+table(dat_eth$ethnicity, dat_eth$view_plants)
+eth_plant <- chisq.test(dat_eth$ethnicity,dat_eth$view_plants,correct = FALSE)
+eth_plant
+
+#ethnicity x view geology
+table(dat_eth$ethnicity, dat_eth$view_geology)
+eth_geo <- chisq.test(dat_eth$ethnicity,dat_eth$view_geology,correct = FALSE)
+eth_geo
+
+#ethnicity x historical interest
+table(dat_eth$ethnicity, dat_eth$historical_interest)
+eth_hist <- chisq.test(dat_eth$ethnicity,dat_eth$historical_interest,correct = FALSE)
+eth_hist
+
+#ethnicity x mt. biking
+table(dat_eth$ethnicity, dat_eth$mountain_biking)
+eth_mtbike <- chisq.test(dat_eth$ethnicity,dat_eth$mountain_biking,correct = FALSE)
+eth_mtbike
+
+#ethnicity x not using the canyon
+table(dat_eth$ethnicity, dat_eth$i_do_not_use_the_canyon)
+eth_notuse <- chisq.test(dat_eth$ethnicity,dat_eth$i_do_not_use_the_canyon,correct = FALSE)
+eth_notuse
+
+#Below looks at the distance people said they would travel if DPC was dammed to recreate by the activity Geology to see if this was correlated at all
+#distance to travel if dammed x geology
+table(dat$ifdammeddist, dat$view_geology)
+dist_geo <- chisq.test(dat$ifdammeddist, dat$view_geology,correct = FALSE)
+dist_geo
+
+#distance to travel if dammed x ethnicity
+table(dat$ifdammeddist, dat$ethnicity)
+dist_eth <- chisq.test(dat_eth$ifdammeddist, dat_eth$ethnicity,correct = FALSE)
+dist_eth
+
+#distance to travel if dammed x patterson resident
+table(dat$ifdammeddist, dat$patterson)
+dist_pat <- chisq.test(dat_eth$ifdammeddist, dat_eth$patterson,correct = FALSE)
+dist_pat
+
+#number of times they would travel if dammed x patterson resident
+table(dat$ifdammedtimes, dat$patterson)
+dist_pat <- chisq.test(dat_eth$ifdammedtimes, dat_eth$patterson,correct = FALSE)
+dist_pat
+#see if you can break this comparison down as this is statistically significant, but unsure if what way
+
+
+
+#number of times they would travel if dammed x ethnicity
+table(dat$ifdammedtimes, dat$ethnicity)
+times_eth <- chisq.test(dat_eth$ifdammedtimes, dat_eth$ethnicity,correct = FALSE)
+times_eth
+
+#if the dam is worth losing recreation x owning water rights
+table(dat$worthit, dat$q18)
+worthit_waterrights <- chisq.test(dat$worthit, dat$q18,correct = FALSE)
+worthit_waterrights
+#just looking to see if the people with water rights are patterson residents or not
+table(dat$q18, dat$patterson)
+
+#if the dam is worth losing recreation x patterson resident
+table(dat$worthit, dat$patterson)
+worthit_patterson <- chisq.test(dat$worthit, dat$patterson,correct = FALSE)
+worthit_patterson
+
+#if the dam is worth losing recreation x income
+table(dat$worthit, dat$income)
+worthit_income <- chisq.test(dat$worthit, dat$income,correct = FALSE)
+worthit_income
+
+```
+
+
+```{r Poisson data}
+#Patterson resident x number of visits
+summaryBy(visits_num_ceiling ~ patterson, data = dat, FUN = mean, na.rm = T)
+lm1 <-glm(visits_num_ceiling ~ patterson, data = dat, family = "poisson")
+summary(lm1)
+anova(lm1)
+params <- model_parameters(lm1)
+params$Parameter <- c("Does not live in Patterson", "Lives in Patterson")
+params$Coefficient[2] <- params$Coefficient[2] + params$Coefficient[1]
+params$CI_low[2] <- params$CI_low[2] + params$Coefficient[1]
+params$CI_high[2] <- params$CI_high[2] + params$Coefficient[1]
+params$Coefficient <- exp(params$Coefficient)
+params$CI_low <- exp(params$CI_low)
+params$CI_high <- exp(params$CI_high)
+attributes(params)[["coefficient_name"]] <- "num_visits"
+params
+
+#Patterson resident x number of visits x ethnicity
+summaryBy(visits_num_ceiling ~ patterson + ethnicity, data = dat_eth, FUN = mean, na.rm = T)
+lm2 <-glm(visits_num_ceiling ~ patterson:ethnicity, data = dat_eth, family = "poisson")
+summary(lm2)
+anova(lm2)
+params2 <- model_parameters(lm2)
+params2$Parameter <- c("Not Hispanc or Latino/a/x; Lives in Patterson",
+                       "Hispanc or Latino/a/x;Does not live in Patterson",
+                       "Hispanc or Latino/a/x; Lives in Patterson",
+                       "Not Hispanc or Latino/a/x; Does not live in Patterson")
+params2$Coefficient[2:4] <- params2$Coefficient[2:4] + params2$Coefficient[1]
+params2$CI_low[2:4] <- params2$CI_low[2:4] + params2$Coefficient[1]
+params2$CI_high[2:4] <- params2$CI_high[2:4] + params2$Coefficient[1]
+params2$Coefficient <- exp(params2$Coefficient)
+params2$CI_low <- exp(params2$CI_low)
+params2$CI_high <- exp(params2$CI_high)
+attributes(params2)[["coefficient_name"]] <- "num_visits"
+params2
+ggplot(params2, aes(x = Parameter, y = Coefficient, label = Coefficient))+
+  geom_point()+
+  geom_errorbar(aes(ymin = CI_low, ymax = CI_high))+
+  # annotate("text", x = params2$Parameter, params2$Coefficient)+
+  theme_bw()+
+  scale_y_continuous("Number of Visits (Ceiling)")+
+  theme(legend.title = element_blank(), axis.title.y = element_blank())+
+  coord_flip()
+
+#Income level x number of visits
+dat_inc <- dplyr::filter(dat, income != "Prefer not to indicate")
+summaryBy(visits_num_ceiling ~ income, data = dat_inc, FUN = mean, na.rm = T)
+lm3 <-glm(visits_num_ceiling ~ income, data = dat_inc, family = "poisson")
+summary(lm3)
+anova(lm3)
+params3 <- model_parameters(lm3)
+params3$Parameter <- c("$0 - $24,999",
+                       "$25,000 - $49,999",
+                       "$50,000 - $74,999",
+                       "$75,000 - $99,999",
+                       "$100,000 - $149,999",
+                       "$150,000 - $199,999",
+                       "$200,000 or greater")
+params3$CI_low[2:7] <- params3$CI_low[2:7] + params3$Coefficient[1]
+params3$CI_high[2:7] <- params3$CI_high[2:7] + params3$Coefficient[1]
+params3$Coefficient[2:7] <- params3$Coefficient[2:7] + params3$Coefficient[1]
+params3$Coefficient <- exp(params3$Coefficient)
+params3$CI_low <- exp(params3$CI_low)
+params3$CI_high <- exp(params3$CI_high)
+attributes(params3)[["coefficient_name"]] <- "num_visits"
+params3
+
+ggplot(params3, aes(x = Parameter, y = Coefficient, label = Coefficient))+
+  geom_point()+
+  geom_errorbar(aes(ymin = CI_low, ymax = CI_high))+
+  # annotate("text", x = params2$Parameter, params2$Coefficient)+
+  theme_bw()+
+  scale_y_continuous("Number of Visits (Ceiling)")+
+  theme(legend.title = element_blank(), axis.title.y = element_blank())+
+  coord_flip()
+
+#Income level x number of visits
+dat_inc_eth <- dplyr::filter(dat_eth, income != "Prefer not to indicate")
+summaryBy(visits_num_ceiling ~ income + ethnicity, data = dat_inc_eth, FUN = mean, na.rm = T)
+table(dat_inc_eth$income, dat_inc_eth$ethnicity)
+
+```
+
+
+```{r Levels of Concern Averages}
+#This creates a subset of data that only includes people who state they live in Patterson
+dat_patterson <- dplyr::filter(dat, patterson != "No (enter city below)")
+
+#Average Concern Level for Water for Ag
+clwaterforag <- mean(dat_patterson$waterforag, na.rm = TRUE)
+clwaterforag
+#Average Concern Level for Drinking Water
+cldw <- mean(dat_patterson$dw, na.rm = TRUE)
+cldw
+#Average Concern Level for Air Quality
+claq <- mean(dat_patterson$aq, na.rm = TRUE)
+claq
+#Average Concern Level for Asthma
+clasthma <- mean(dat_patterson$asthma, na.rm = TRUE)
+clasthma
+#Average Concern Level for Access to Natural Spaces
+clnatspaces <- mean(dat_patterson$natspace, na.rm = TRUE)
+clnatspaces
+#Average Concern Level for Flooding
+clflooding <- mean(dat_patterson$flooding, na.rm = TRUE)
+clflooding
+#Average Concern Level for Endangered Species
+cles <- mean(dat_patterson$es, na.rm = TRUE)
+cles
+
+#Average number of visits Patterson
+avnumvisits_pat <-mean(dat_patterson$visits_num, na.rm = TRUE)
+avnumvisits_pat
+
+#average number of miles driven to get to DPC for respondents from Patterson
+dat_patterson$distance <- as.numeric(dat_patterson$q3)
+avdist_pat <-mean(dat_patterson$distance, na.rm = TRUE)
+avdist_pat
+```
